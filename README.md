@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>DNA / RNA Matching Game</title>
+
+<style>
+body{
+    margin:0;
+    background:#f5f5dc;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+
+canvas{
+    background:#f5f5dc;
+    max-width:100%;
+    height:auto;
+}
+</style>
+
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+
+/* ================= CANVAS FIXED RATIO ================= */
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const BASE_WIDTH = 750;
+const BASE_HEIGHT = 550;
+
+let scale = 1;
+
+function resizeCanvas(){
+
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    scale = Math.min(w/BASE_WIDTH, h/BASE_HEIGHT);
+
+    canvas.width = BASE_WIDTH * scale;
+    canvas.height = BASE_HEIGHT * scale;
+
+    ctx.setTransform(scale,0,0,scale,0,0);
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+
+/* ================= SETTINGS ================= */
+
+const MESSAGE_TIME = 7000;
+
+let level = "DNA";
+let gameStarted = false;
+let showMessage = false;
+let messageLines = [];
+let showRestart = false;
+
+let score = 0;
+let currentIndex = 0;
+let feedback = null;
+
+const stripSpeed = 1.2;
+
+
+/* ================= DATA ================= */
+
+const pairs = {
+    DNA:{A:"T",T:"A",C:"G",G:"C"},
+    RNA:{A:"U",U:"A",C:"G",G:"C"}
+};
+
+function randomStr(len){
+    const bases = level==="DNA"
+        ? ["A","T","C","G"]
+        : ["A","U","C","G"];
+
+    return Array.from({length:len},
+        ()=>bases[Math.floor(Math.random()*bases.length)]);
+}
+
+
+/* ================= GAME STATE ================= */
+
+let topStrand = randomStr(6);
+let bottomStrand = Array(6).fill("_");
+
+
+/* ================= MOVING STRIP ================= */
+
+let movingStrip = randomStr(40);
+let stripOffset = 0;
+
+
+/* ================= BUTTONS ================= */
+
+let buttons = [];
+
+function createButtons(){
+
+    buttons = [];
+
+    const bases = level==="DNA"
+        ? ["A","T","C","G"]
+        : ["A","U","C","G"];
+
+    let x = 160;
+
+    bases.forEach(b=>{
+        buttons.push({b,x,y:330,w:90,h:50});
+        x += 120;
+    });
+}
+
+createButtons();
+
+
+/* ================= TEXT ================= */
+
+function drawText(text,x,y,size=30,color="#000",center=false){
+
+    ctx.fillStyle=color;
+    ctx.font=size+"px Arial";
+
+    if(center){
+        ctx.textAlign="center";
+        ctx.fillText(text,x,y);
+        ctx.textAlign="left";
+    } else {
+        ctx.fillText(text,x,y);
+    }
+}
+
+
+/* ================= ORIGINAL STRIP ================= */
+
+function drawMovingStrip(){
+
+    stripOffset += stripSpeed;
+
+    movingStrip.forEach((b,i)=>{
+
+        const x = (i*50 + stripOffset) % (BASE_WIDTH+50) - 50;
+        const y = 120 + 15*Math.sin(x/100*2*Math.PI);
+
+        ctx.fillStyle = i%2===0 ? "#957dad" : "#fff89a";
+        ctx.fillRect(x,y,40,40);
+
+        drawText(
+            b,
+            x+12,
+            y+28,
+            20,
+            i%2===0?"white":"black"
+        );
+    });
+}
+
+
+/* ================= START ================= */
+
+function drawStart(){
+
+    ctx.clearRect(0,0,BASE_WIDTH,BASE_HEIGHT);
+
+    drawText("Learn Nucleic Acids",BASE_WIDTH/2,80,50,"#957dad",true);
+    drawText("Level: "+level,BASE_WIDTH/2,130,32,"#957dad",true);
+
+    const lines = level==="DNA"
+    ? [
+        "Welcome to the DNA Learning Game!",
+        "Our goal is to learn DNA base pairing.",
+        "",
+        "A   pairing   T",
+        "G   pairing   C"
+      ]
+    : [
+        "Welcome to the RNA Learning Game!",
+        "Our goal is to learn RNA base pairing.",
+        "",
+        "A   pairing   U",
+        "G   pairing   C"
+      ];
+
+    let y = 200;
+
+    lines.forEach(l=>{
+        drawText(l,BASE_WIDTH/2,y,26,"black",true);
+        y += 35;
+    });
+
+    ctx.fillStyle="#957dad";
+    ctx.fillRect(275,430,200,60);
+
+    drawText("Start Game",375,470,28,"#fff89a",true);
+}
+
+
+/* ================= GAME ================= */
+
+function drawGame(){
+
+    ctx.clearRect(0,0,BASE_WIDTH,BASE_HEIGHT);
+
+    drawMovingStrip();
+
+    drawText("Learn Nucleic Acids",BASE_WIDTH/2,50,45,"#957dad",true);
+    drawText("Level: "+level,BASE_WIDTH/2,90,30,"#957dad",true);
+
+    let startX = 280;
+
+    topStrand.forEach((b,i)=>{
+        ctx.fillStyle="#957dad";
+        ctx.fillRect(startX+i*60,180,50,50);
+        drawText(b,startX+i*60+18,215,30,"white");
+    });
+
+    bottomStrand.forEach((b,i)=>{
+        ctx.fillStyle=b==="_"?"white":"#fff89a";
+        ctx.fillRect(startX+i*60,250,50,50);
+        drawText(b,startX+i*60+18,285,30,"black");
+    });
+
+    buttons.forEach(btn=>{
+        ctx.fillStyle="#957dad";
+        ctx.fillRect(btn.x,btn.y,btn.w,btn.h);
+        drawText(btn.b,btn.x+35,btn.y+35,30,"#fff89a");
+    });
+
+    drawText("Score: "+score,BASE_WIDTH/2,520,25,"black",true);
+
+    if(feedback){
+        drawText(
+            feedback==="correct"?"✅":"❌",
+            BASE_WIDTH/2,430,80,
+            feedback==="correct"?"green":"red",
+            true
+        );
+    }
+}
+
+
+/* ================= MESSAGE ================= */
+
+function drawMessage(){
+
+    ctx.clearRect(0,0,BASE_WIDTH,BASE_HEIGHT);
+
+    let y = BASE_HEIGHT/2 - 30;
+
+    messageLines.forEach(l=>{
+        drawText(l,BASE_WIDTH/2,y,36,"#957dad",true);
+        y += 45;
+    });
+
+    if(showRestart){
+
+        ctx.fillStyle="#957dad";
+        ctx.fillRect(275,420,200,60);
+
+        drawText("Restart Game",375,460,26,"#fff89a",true);
+    }
+}
+
+
+/* ================= RESET ================= */
+
+function resetGame(){
+
+    level="DNA";
+    resetLevel();
+}
+
+function resetLevel(){
+
+    topStrand = randomStr(6);
+    bottomStrand = Array(6).fill("_");
+    movingStrip = randomStr(40);
+    stripOffset = 0;
+
+    score = 0;
+    currentIndex = 0;
+    feedback = null;
+
+    gameStarted = false;
+    showMessage = false;
+    showRestart = false;
+
+    createButtons();
+}
+
+
+/* ================= INPUT ================= */
+
+canvas.addEventListener("click",e=>{
+
+    const rect = canvas.getBoundingClientRect();
+
+    const mx = (e.clientX-rect.left)/scale;
+    const my = (e.clientY-rect.top)/scale;
+
+    if(showRestart){
+
+        if(mx>275 && mx<475 && my>420 && my<480){
+            resetGame();
+        }
+        return;
+    }
+
+    if(showMessage) return;
+
+    if(!gameStarted){
+
+        if(mx>275 && mx<475 && my>430 && my<490){
+            gameStarted=true;
+        }
+        return;
+    }
+
+    buttons.forEach(btn=>{
+
+        if(mx>btn.x && mx<btn.x+btn.w &&
+           my>btn.y && my<btn.y+btn.h &&
+           currentIndex<6){
+
+            const correct = pairs[level][topStrand[currentIndex]];
+
+            if(btn.b===correct){
+                bottomStrand[currentIndex]=btn.b;
+                score++;
+                feedback="correct";
+            } else {
+                score--;
+                feedback="wrong";
+            }
+
+            currentIndex++;
+            setTimeout(()=>feedback=null,800);
+        }
+    });
+
+    if(currentIndex>=6){
+
+        gameStarted=false;
+        showMessage=true;
+
+        if(score>=6){
+
+            if(level==="DNA"){
+
+                level="RNA";
+                messageLines=["Great job!","Welcome to RNA level"];
+
+                setTimeout(()=>{
+                    showMessage=false;
+                    resetLevel();
+                },MESSAGE_TIME);
+
+            } else {
+
+                messageLines=[
+                    "Congratulations!",
+                    "You mastered nucleic acid pairing!"
+                ];
+
+                showRestart=true;
+
+                setTimeout(()=>resetGame(),MESSAGE_TIME);
+            }
+
+        } else {
+
+            messageLines=["Keep trying!","Practice again!"];
+            setTimeout(()=>resetGame(),MESSAGE_TIME);
+        }
+    }
+});
+
+
+/* ================= LOOP ================= */
+
+function loop(){
+
+    if(showMessage) drawMessage();
+    else if(gameStarted) drawGame();
+    else drawStart();
+
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+</script>
+
+</body>
+</html>
